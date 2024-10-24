@@ -1,0 +1,1 @@
+Readme file for Decentralized Insurance Smart Contract
