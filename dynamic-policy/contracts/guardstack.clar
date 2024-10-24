@@ -40,7 +40,7 @@
     }
 )
 
-;; Enhanced policy structure
+;; Policy structure
 (define-map insurance-policies
     principal
     {
@@ -57,7 +57,7 @@
     }
 )
 
-;; Enhanced claims structure
+;; Claims structure
 (define-map insurance-claims
     {policyholder: principal, claim-id: uint}
     {
@@ -106,13 +106,14 @@
     (map-get? risk-profiles user)
 )
 
+;; calculate-premiums function
 (define-read-only (calculate-premiums (tier uint) (coverage uint) (risk-score uint))
     (let (
         (tier-info (unwrap! (map-get? policy-tiers tier) ERR-INVALID-PARAMETERS))
         (base-amount (var-get base-premium))
         (risk-multiplier (+ u100 risk-score))
     )
-    (/ (* (* coverage risk-multiplier) (- u100 (get premium-discount tier-info))) u10000))
+    (ok (/ (* (* coverage risk-multiplier) (- u100 (get premium-discount tier-info))) u10000)))
 )
 
 ;; Private functions
@@ -136,7 +137,7 @@
     (/ (+ (* base u2) (* claims u3) (* stake u1)) u6))
 )
 
-;; Enhanced public functions
+;; Public functions
 (define-public (initialize-policy-tiers)
     (begin
         (asserts! (is-eq tx-sender (var-get protocol-owner)) ERR-UNAUTHORIZED)
@@ -169,10 +170,11 @@
     )
 )
 
+;; purchase-advanced-policy to handle calculate-premiums response
 (define-public (purchase-advanced-policy (tier uint) (coverage uint) (stake-amount uint) (duration uint))
     (let (
         (risk-score (calculate-risk-score tx-sender))
-        (premium-amount (calculate-premiums tier coverage risk-score))
+        (premium-amount (unwrap! (calculate-premiums tier coverage risk-score) ERR-INVALID-PARAMETERS))
         (start-block block-height)
         (end-block (+ block-height duration))
         (tier-info (unwrap! (map-get? policy-tiers tier) ERR-INVALID-PARAMETERS))
@@ -201,7 +203,8 @@
         claims-made: u0,
         status: "ACTIVE",
         last-claim-block: u0
-    }))))
+    })))
+)
 
 (define-public (submit-enhanced-claim 
     (amount uint) 
@@ -272,7 +275,7 @@
     ;; Transfer stake
     (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
 
-    ;; Update staking info
+    ;; staking info
     (ok (map-set staker-info tx-sender
         {
             amount: (+ (get amount current-stake) amount),
@@ -294,7 +297,7 @@
     ;; Transfer rewards
     (try! (as-contract (stx-transfer? rewards-earned (as-contract tx-sender) tx-sender)))
 
-    ;; Update staking info
+    ;; staking info
     (ok (map-set staker-info tx-sender
         (merge staker {
             rewards: u0,
